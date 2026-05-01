@@ -18,7 +18,7 @@ export default function Home() {
     setMessaggio('Controllo in corso...')
 
     const { data, error } = await supabase
-      .from('Teams')
+      .from('teams')
       .select('*')
       .eq('nome_squadra', nome.trim())
       .eq('password', password.trim())
