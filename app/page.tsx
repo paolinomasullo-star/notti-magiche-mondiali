@@ -10,19 +10,45 @@ const supabase = createClient(
 
 export default function Home() {
   const [matches, setMatches] = useState([])
+  const [pronostici, setPronostici] = useState({})
 
   useEffect(() => {
     loadMatches()
   }, [])
 
   async function loadMatches() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('matches')
       .select('*')
 
-    if (!error) {
-      setMatches(data)
+    setMatches(data || [])
+  }
+
+  function aggiornaPronostico(matchId, campo, valore) {
+    setPronostici({
+      ...pronostici,
+      [matchId]: {
+        ...pronostici[matchId],
+        [campo]: valore
+      }
+    })
+  }
+
+  async function salvaPronostico(matchId) {
+    const p = pronostici[matchId]
+
+    if (!p || !p.casa || !p.trasferta) {
+      alert('Inserisci entrambi i gol')
+      return
     }
+
+    await supabase.from('predictions').insert({
+      match_id: matchId,
+      gol_casa: parseInt(p.casa),
+      gol_trasferta: parseInt(p.trasferta)
+    })
+
+    alert('Pronostico salvato!')
   }
 
   return (
@@ -38,9 +64,27 @@ export default function Home() {
           </div>
 
           <div style={{ marginTop: 10 }}>
-            <input placeholder="gol casa" />
-            <input placeholder="gol trasferta" style={{ marginLeft: 10 }} />
-            <button style={{ marginLeft: 10 }}>Salva</button>
+            <input
+              placeholder="gol casa"
+              onChange={(e) =>
+                aggiornaPronostico(match.id, 'casa', e.target.value)
+              }
+            />
+
+            <input
+              placeholder="gol trasferta"
+              style={{ marginLeft: 10 }}
+              onChange={(e) =>
+                aggiornaPronostico(match.id, 'trasferta', e.target.value)
+              }
+            />
+
+            <button
+              style={{ marginLeft: 10 }}
+              onClick={() => salvaPronostico(match.id)}
+            >
+              Salva
+            </button>
           </div>
         </div>
       ))}
