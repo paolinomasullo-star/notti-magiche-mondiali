@@ -32,25 +32,25 @@ export default function Home() {
     setTeams(data || [])
   }
 
-  async function login() {
-    const nomePulito = nome.trim()
-    const passwordPulita = password.trim()
+ async function login() {
+  const nomePulito = nome.trim().toLowerCase()
+  const passwordPulita = password.trim()
 
-    const trovato = teams.find(
-      (t) =>
-        t.nome_squadra === nomePulito &&
-        t.password === passwordPulita
+  const trovato = teams.find(
+    (t) =>
+      t.nome_squadra.toLowerCase() === nomePulito &&
+      t.password === passwordPulita
+  )
+
+  if (!trovato) {
+    setMessaggio(
+      'Credenziali sbagliate. Sto leggendo ' + teams.length + ' squadre.'
     )
-
-    if (!trovato) {
-      setMessaggio(
-        'Credenziali sbagliate. Sto leggendo ' + teams.length + ' squadre.'
-      )
-      return
-    }
-
-    setTeam(trovato)
+    return
   }
+
+  setTeam(trovato)
+}
 
   if (team) {
     return (
