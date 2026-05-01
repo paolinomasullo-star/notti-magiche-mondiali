@@ -25,32 +25,33 @@ export default function Home() {
       .select('*')
 
     if (error) {
-      setMessaggio('Errore lettura Teams: ' + error.message)
+      setMessaggio('Errore Supabase: ' + error.message)
       return
     }
 
     setTeams(data || [])
   }
 
- async function login() {
-  const nomePulito = nome.trim().toLowerCase()
-  const passwordPulita = password.trim()
+  async function login() {
+    const nomePulito = nome.trim().toLowerCase()
+    const passwordPulita = password.trim().toLowerCase()
 
-  const trovato = teams.find(
-    (t) =>
-      t.nome_squadra.toLowerCase() === nomePulito &&
-      t.password === passwordPulita
-  )
+    const trovato = teams.find((t) => {
+      return (
+        t.nome_squadra.toLowerCase().trim() === nomePulito &&
+        t.password.toLowerCase().trim() === passwordPulita
+      )
+    })
 
-  if (!trovato) {
-    setMessaggio(
-      'Credenziali sbagliate. Sto leggendo ' + teams.length + ' squadre.'
-    )
-    return
+    if (!trovato) {
+      setMessaggio(
+        'Credenziali sbagliate. Sto leggendo ' + teams.length + ' squadre.'
+      )
+      return
+    }
+
+    setTeam(trovato)
   }
-
-  setTeam(trovato)
-}
 
   if (team) {
     return (
@@ -87,11 +88,11 @@ export default function Home() {
 
       <p>{messaggio}</p>
 
-      <h3>Debug squadre lette da Supabase</h3>
+      <h3>Debug squadre</h3>
 
       {teams.map((t) => (
         <div key={t.id}>
-          {t.nome_squadra} / {t.password}
+          [{t.nome_squadra}] / [{t.password}]
         </div>
       ))}
     </main>
