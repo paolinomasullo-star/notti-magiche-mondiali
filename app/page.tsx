@@ -25,12 +25,17 @@ export default function Home() {
   }
 
   async function login() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('Teams')
       .select('*')
-      .eq('nome_squadra', nome)
-      .eq('password', password)
-      .single()
+      .eq('nome_squadra', nome.trim())
+      .eq('password', password.trim())
+      .maybeSingle()
+
+    if (error) {
+      alert('Errore Supabase: ' + error.message)
+      return
+    }
 
     if (!data) {
       alert('Credenziali sbagliate')
@@ -63,12 +68,17 @@ export default function Home() {
       return
     }
 
-    await supabase.from('predictions').insert({
+    const { error } = await supabase.from('prediction').insert({
       team_id: team.id,
       match_id: matchId,
       gol_casa: parseInt(p.casa),
       gol_trasferta: parseInt(p.trasferta)
     })
+
+    if (error) {
+      alert('Errore salvataggio: ' + error.message)
+      return
+    }
 
     alert('Pronostico salvato!')
   }
