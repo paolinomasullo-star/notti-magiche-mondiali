@@ -64,7 +64,20 @@ export default function Home() {
           <p>Nessuna partita trovata nel database.</p>
         )}
 
-        {matches.map((match) => (
+       {matches.map((match) => (
+  <div className="match" key={match.id}>
+    <div>
+      <strong>{match.squadra_casa} vs {match.squadra_trasferta}</strong>
+      <div className="small">{match.fase}</div>
+    </div>
+
+    <div>
+      <input placeholder="gol casa" style={{ width: 50 }} />
+      <input placeholder="gol trasferta" style={{ width: 50 }} />
+      <button>Salva</button>
+    </div>
+  </div>
+))}
           <div className="match" key={match.id}>
             <div>
               <strong>{match.squadra_casa} vs {match.squadra_trasferta}</strong>
