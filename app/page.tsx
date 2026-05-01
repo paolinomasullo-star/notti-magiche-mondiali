@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -9,86 +8,42 @@ const supabase = createClient(
   'sb_publishable_Jbae6ZpDeGfvZ9Gji3WMFg_vu20QygE'
 )
 
-type Match = {
-  id: number
-  fase: string
-  squadra_casa: string
-  squadra_trasferta: string
-  data_ora: string
-  gol_casa: number | null
-  gol_trasferta: number | null
-  qualificata: string | null
-}
-
 export default function Home() {
-  const [matches, setMatches] = useState<Match[]>([])
-  const [loading, setLoading] = useState(true)
-  const [errore, setErrore] = useState('')
+  const [matches, setMatches] = useState([])
 
   useEffect(() => {
-    fetchMatches()
+    loadMatches()
   }, [])
 
-  async function fetchMatches() {
+  async function loadMatches() {
     const { data, error } = await supabase
       .from('matches')
       .select('*')
-      .order('data_ora', { ascending: true })
 
-    if (error) {
-      setErrore(error.message)
-    } else {
-      setMatches(data || [])
+    if (!error) {
+      setMatches(data)
     }
-
-    setLoading(false)
   }
 
   return (
-    <main>
+    <main style={{ padding: 20 }}>
       <h1>Notti Magiche Mondiali ⚽</h1>
-      <p>Primo test del gioco di pronostici.</p>
 
-      <div className="card">
-        <h2>Partite</h2>
+      <h2>Partite</h2>
 
-        {loading && <p>Caricamento partite...</p>}
-
-        {errore && (
-          <p className="error">
-            Errore collegamento Supabase: {errore}
-          </p>
-        )}
-
-        {!loading && !errore && matches.length === 0 && (
-          <p>Nessuna partita trovata nel database.</p>
-        )}
-
-        {matches.map((match) => (
-  <div className="match" key={match.id}>
-    <div>
-      <strong>{match.squadra_casa} vs {match.squadra_trasferta}</strong>
-      <div className="small">{match.fase}</div>
-    </div>
-
-    <div>
-      <input placeholder="gol casa" style={{ width: 50 }} />
-      <input placeholder="gol trasferta" style={{ width: 50 }} />
-      <button>Salva</button>
-    </div>
-  </div>
-))}
-          <div className="match" key={match.id}>
-            <div>
-              <strong>{match.squadra_casa} vs {match.squadra_trasferta}</strong>
-              <div className="small">{match.fase}</div>
-            </div>
-            <div className="small">
-              {match.data_ora ? new Date(match.data_ora).toLocaleString('it-IT') : ''}
-            </div>
+      {matches.map((match) => (
+        <div key={match.id} style={{ marginBottom: 20 }}>
+          <div>
+            {match.squadra_casa} vs {match.squadra_trasferta}
           </div>
-        ))}
-      </div>
+
+          <div style={{ marginTop: 10 }}>
+            <input placeholder="gol casa" />
+            <input placeholder="gol trasferta" style={{ marginLeft: 10 }} />
+            <button style={{ marginLeft: 10 }}>Salva</button>
+          </div>
+        </div>
+      ))}
     </main>
   )
 }
