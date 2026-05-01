@@ -26,7 +26,7 @@ export default function Home() {
 
   async function login() {
     const { data } = await supabase
-      .from('teams')
+      .from('Teams')
       .select('*')
       .eq('nome_squadra', nome)
       .eq('password', password)
