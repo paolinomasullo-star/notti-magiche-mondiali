@@ -9,104 +9,39 @@ const supabase = createClient(
 )
 
 export default function Home() {
-  const [matches, setMatches] = useState([])
-  const [pronostici, setPronostici] = useState({})
   const [nome, setNome] = useState('')
   const [password, setPassword] = useState('')
+  const [messaggio, setMessaggio] = useState('')
   const [team, setTeam] = useState(null)
 
-  useEffect(() => {
-    loadMatches()
-  }, [])
-
-  async function loadMatches() {
-    const { data } = await supabase.from('matches').select('*')
-    setMatches(data || [])
-  }
-
   async function login() {
+    setMessaggio('Controllo in corso...')
+
     const { data, error } = await supabase
       .from('Teams')
       .select('*')
       .eq('nome_squadra', nome.trim())
       .eq('password', password.trim())
-      .maybeSingle()
 
     if (error) {
-      alert('Errore Supabase: ' + error.message)
+      setMessaggio('Errore Supabase: ' + error.message)
       return
     }
 
-    if (!data) {
-      alert('Credenziali sbagliate')
+    setMessaggio('Risultati trovati: ' + data.length)
+
+    if (data.length === 0) {
       return
     }
 
-    setTeam(data)
+    setTeam(data[0])
   }
 
-  function aggiornaPronostico(matchId, campo, valore) {
-    setPronostici({
-      ...pronostici,
-      [matchId]: {
-        ...pronostici[matchId],
-        [campo]: valore
-      }
-    })
-  }
-
-  async function salvaPronostico(matchId) {
-    if (!team) {
-      alert('Devi fare login')
-      return
-    }
-
-    const p = pronostici[matchId]
-
-    if (!p || !p.casa || !p.trasferta) {
-      alert('Inserisci entrambi i gol')
-      return
-    }
-
-    const { error } = await supabase.from('prediction').insert({
-      team_id: team.id,
-      match_id: matchId,
-      gol_casa: parseInt(p.casa),
-      gol_trasferta: parseInt(p.trasferta)
-    })
-
-    if (error) {
-      alert('Errore salvataggio: ' + error.message)
-      return
-    }
-
-    alert('Pronostico salvato!')
-  }
-
-  if (!team) {
+  if (team) {
     return (
       <main style={{ padding: 20 }}>
         <h1>Notti Magiche Mondiali ⚽</h1>
-
-        <h2>Login squadra</h2>
-
-        <input
-          placeholder="nome squadra"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-        />
-
-        <input
-          placeholder="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ marginLeft: 10 }}
-        />
-
-        <button onClick={login} style={{ marginLeft: 10 }}>
-          Entra
-        </button>
+        <h2>Ciao {team.nome_squadra}</h2>
       </main>
     )
   }
@@ -115,37 +50,27 @@ export default function Home() {
     <main style={{ padding: 20 }}>
       <h1>Notti Magiche Mondiali ⚽</h1>
 
-      <h2>Ciao {team.nome_squadra}</h2>
+      <h2>Login squadra</h2>
 
-      {matches.map((match) => (
-        <div key={match.id} style={{ marginBottom: 20 }}>
-          <div>
-            {match.squadra_casa} vs {match.squadra_trasferta}
-          </div>
+      <input
+        placeholder="nome squadra"
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+      />
 
-          <input
-            placeholder="gol casa"
-            onChange={(e) =>
-              aggiornaPronostico(match.id, 'casa', e.target.value)
-            }
-          />
+      <input
+        placeholder="password"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{ marginLeft: 10 }}
+      />
 
-          <input
-            placeholder="gol trasferta"
-            onChange={(e) =>
-              aggiornaPronostico(match.id, 'trasferta', e.target.value)
-            }
-            style={{ marginLeft: 10 }}
-          />
+      <button onClick={login} style={{ marginLeft: 10 }}>
+        Entra
+      </button>
 
-          <button
-            onClick={() => salvaPronostico(match.id)}
-            style={{ marginLeft: 10 }}
-          >
-            Salva
-          </button>
-        </div>
-      ))}
+      <p>{messaggio}</p>
     </main>
   )
 }
