@@ -12,45 +12,32 @@ export default function Home() {
   const [matches, setMatches] = useState([])
   const [teams, setTeams] = useState([])
   const [team, setTeam] = useState(null)
-
   const [nome, setNome] = useState('')
   const [password, setPassword] = useState('')
-
   const [pronostici, setPronostici] = useState({})
-  const [pronosticiLista, setPronosticiLista] = useState([])
+  const [classifica, setClassifica] = useState([])
   const [messaggio, setMessaggio] = useState('')
 
   useEffect(() => {
-    caricaTeams()
-    caricaMatches()
-    caricaPronostici()
+    caricaDati()
   }, [])
 
-  async function caricaTeams() {
-    const { data } = await supabase.from('Teams').select('*')
-    setTeams(data || [])
-  }
+  async function caricaDati() {
+    const { data: teamsData } = await supabase.from('Teams').select('*')
+    const { data: matchesData } = await supabase.from('matches').select('*')
+    const { data: predictionData } = await supabase.from('prediction').select('*')
 
-  async function caricaMatches() {
-    const { data } = await supabase.from('matches').select('*')
-    setMatches(data || [])
-  }
+    setTeams(teamsData || [])
+    setMatches(matchesData || [])
 
-  async function caricaPronostici() {
-    const { data } = await supabase.from('prediction').select('*')
-    setPronosticiLista(data || [])
+    calcolaClassifica(teamsData || [], predictionData || [])
   }
 
   function login() {
-    const nomePulito = nome.trim().toLowerCase()
-    const passwordPulita = password.trim().toLowerCase()
-
-    const trovato = teams.find((t) => {
-      return (
-        t.nome_squadra.toLowerCase().trim() === nomePulito &&
-        t.password.toLowerCase().trim() === passwordPulita
-      )
-    })
+    const trovato = teams.find((t) =>
+      t.nome_squadra.toLowerCase().trim() === nome.trim().toLowerCase() &&
+      t.password.toLowerCase().trim() === password.trim().toLowerCase()
+    )
 
     if (!trovato) {
       setMessaggio('Credenziali sbagliate')
@@ -70,44 +57,9 @@ export default function Home() {
     })
   }
 
-  async function salvaPronostico(matchId) {
-    if (!team) {
-      alert('Devi fare login')
-      return
-    }
-
-    const p = pronostici[matchId]
-
-    if (!p || !p.casa || !p.trasferta) {
-      alert('Inserisci entrambi i gol')
-      return
-    }
-
-    const { error } = await supabase.from('prediction').insert({
-      team_id: team.id,
-      match_id: matchId,
-      gol_casa: parseInt(p.casa),
-      gol_trasferta: parseInt(p.trasferta)
-    })
-
-    if (error) {
-      alert('Errore salvataggio: ' + error.message)
-      return
-    }
-
-    await caricaPronostici()
-    alert('Pronostico salvato!')
-  }
-
-  function calcolaPunti(p, match) {
-    if (match.gol_casa == null || match.gol_trasferta == null) {
-      return 0
-    }
-
-    const realeCasa = match.gol_casa
-    const realeTrasferta = match.gol_trasferta
-    const pronCasa = p.gol_casa
-    const pronTrasferta = p.gol_trasferta
+  function calcolaPunti(pronCasa, pronTrasferta, realeCasa, realeTrasferta) {
+    if (realeCasa === null || realeTrasferta === null) return 0
+    if (realeCasa === undefined || realeTrasferta === undefined) return 0
 
     if (pronCasa === realeCasa && pronTrasferta === realeTrasferta) {
       return 10
@@ -135,19 +87,61 @@ export default function Home() {
     return 0
   }
 
-  function puntiSquadra(teamId) {
-    let totale = 0
+  function calcolaClassifica(listaTeams, listaPronostici) {
+    const nuovaClassifica = listaTeams.map((t) => {
+      const puntiTotali = listaPronostici
+        .filter((p) => p.team_id === t.id)
+        .reduce((totale, p) => totale + (p.punti || 0), 0)
 
-    pronosticiLista.forEach((p) => {
-      if (p.team_id !== teamId) return
-
-      const match = matches.find((m) => m.id === p.match_id)
-      if (!match) return
-
-      totale += calcolaPunti(p, match)
+      return {
+        id: t.id,
+        nome_squadra: t.nome_squadra,
+        punti: puntiTotali
+      }
     })
 
-    return totale
+    nuovaClassifica.sort((a, b) => b.punti - a.punti)
+    setClassifica(nuovaClassifica)
+  }
+
+  async function salvaPronostico(match) {
+    if (!team) {
+      alert('Devi fare login')
+      return
+    }
+
+    const p = pronostici[match.id]
+
+    if (!p || p.casa === undefined || p.trasferta === undefined || p.casa === '' || p.trasferta === '') {
+      alert('Inserisci entrambi i gol')
+      return
+    }
+
+    const pronCasa = parseInt(p.casa)
+    const pronTrasferta = parseInt(p.trasferta)
+
+    const punti = calcolaPunti(
+      pronCasa,
+      pronTrasferta,
+      match.gol_casa,
+      match.gol_trasferta
+    )
+
+    const { error } = await supabase.from('prediction').insert({
+      team_id: team.id,
+      match_id: match.id,
+      gol_casa: pronCasa,
+      gol_trasferta: pronTrasferta,
+      punti: punti
+    })
+
+    if (error) {
+      alert('Errore salvataggio: ' + error.message)
+      return
+    }
+
+    await caricaDati()
+    alert('Pronostico salvato! Punti: ' + punti)
   }
 
   if (!team) {
@@ -210,27 +204,25 @@ export default function Home() {
           />
 
           <button
-            onClick={() => salvaPronostico(match.id)}
+            onClick={() => salvaPronostico(match)}
             style={{ marginLeft: 10 }}
           >
             Salva
           </button>
+
+          <div style={{ fontSize: 13, marginTop: 5 }}>
+            Risultato reale: {match.gol_casa ?? '-'} - {match.gol_trasferta ?? '-'}
+          </div>
         </div>
       ))}
 
       <h3>Classifica</h3>
 
-      {teams
-        .map((t) => ({
-          ...t,
-          punti: puntiSquadra(t.id)
-        }))
-        .sort((a, b) => b.punti - a.punti)
-        .map((t) => (
-          <div key={t.id}>
-            {t.nome_squadra} → {t.punti} punti
-          </div>
-        ))}
+      {classifica.map((t) => (
+        <div key={t.id}>
+          {t.nome_squadra} → {t.punti} punti
+        </div>
+      ))}
     </main>
   )
 }
