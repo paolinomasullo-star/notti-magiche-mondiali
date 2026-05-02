@@ -12,10 +12,10 @@ export default function Home() {
   const [matches, setMatches] = useState([])
   const [teams, setTeams] = useState([])
   const [team, setTeam] = useState(null)
+
   const [nome, setNome] = useState('')
   const [password, setPassword] = useState('')
   const [pronostici, setPronostici] = useState({})
-  const [classifica, setClassifica] = useState([])
   const [messaggio, setMessaggio] = useState('')
 
   useEffect(() => {
@@ -24,13 +24,13 @@ export default function Home() {
 
   async function caricaDati() {
     const { data: teamsData } = await supabase.from('Teams').select('*')
-    const { data: matchesData } = await supabase.from('matches').select('*')
-    const { data: predictionData } = await supabase.from('prediction').select('*')
+    const { data: matchesData } = await supabase
+      .from('matches')
+      .select('*')
+      .order('data_ora', { ascending: true })
 
     setTeams(teamsData || [])
     setMatches(matchesData || [])
-
-    calcolaClassifica(teamsData || [], predictionData || [])
   }
 
   function login() {
@@ -45,6 +45,7 @@ export default function Home() {
     }
 
     setTeam(trovato)
+    setMessaggio('')
   }
 
   function aggiornaPronostico(matchId, campo, valore) {
@@ -57,59 +58,7 @@ export default function Home() {
     })
   }
 
-  function calcolaPunti(pronCasa, pronTrasferta, realeCasa, realeTrasferta) {
-    if (realeCasa === null || realeTrasferta === null) return 0
-    if (realeCasa === undefined || realeTrasferta === undefined) return 0
-
-    if (pronCasa === realeCasa && pronTrasferta === realeTrasferta) {
-      return 10
-    }
-
-    const diffReale = realeCasa - realeTrasferta
-    const diffPron = pronCasa - pronTrasferta
-
-    if (diffReale !== 0 && diffReale === diffPron) {
-      return 5
-    }
-
-    if (
-      (diffReale > 0 && diffPron > 0) ||
-      (diffReale < 0 && diffPron < 0) ||
-      (diffReale === 0 && diffPron === 0)
-    ) {
-      return 3
-    }
-
-    if (pronCasa + pronTrasferta === realeCasa + realeTrasferta) {
-      return 1
-    }
-
-    return 0
-  }
-
-  function calcolaClassifica(listaTeams, listaPronostici) {
-    const nuovaClassifica = listaTeams.map((t) => {
-      const puntiTotali = listaPronostici
-        .filter((p) => p.team_id === t.id)
-        .reduce((totale, p) => totale + (p.punti || 0), 0)
-
-      return {
-        id: t.id,
-        nome_squadra: t.nome_squadra,
-        punti: puntiTotali
-      }
-    })
-
-    nuovaClassifica.sort((a, b) => b.punti - a.punti)
-    setClassifica(nuovaClassifica)
-  }
-
-  async function salvaPronostico(match) {
-    if (!team) {
-      alert('Devi fare login')
-      return
-    }
-
+  async function inviaPronostico(match) {
     const p = pronostici[match.id]
 
     if (!p || p.casa === undefined || p.trasferta === undefined || p.casa === '' || p.trasferta === '') {
@@ -117,112 +66,211 @@ export default function Home() {
       return
     }
 
-    const pronCasa = parseInt(p.casa)
-    const pronTrasferta = parseInt(p.trasferta)
+    const golCasa = parseInt(p.casa)
+    const golTrasferta = parseInt(p.trasferta)
 
-    const punti = calcolaPunti(
-      pronCasa,
-      pronTrasferta,
-      match.gol_casa,
-      match.gol_trasferta
-    )
+    if (isNaN(golCasa) || isNaN(golTrasferta) || golCasa < 0 || golTrasferta < 0) {
+      alert('Inserisci numeri validi')
+      return
+    }
+
+    await supabase
+      .from('prediction')
+      .delete()
+      .eq('team_id', team.id)
+      .eq('match_id', match.id)
 
     const { error } = await supabase.from('prediction').insert({
       team_id: team.id,
       match_id: match.id,
-      gol_casa: pronCasa,
-      gol_trasferta: pronTrasferta,
-      punti: punti
+      gol_casa: golCasa,
+      gol_trasferta: golTrasferta,
+      punti: 0,
+      inviato_il: new Date().toISOString()
     })
 
     if (error) {
-      alert('Errore salvataggio: ' + error.message)
+      alert('Errore invio: ' + error.message)
       return
     }
 
-    await caricaDati()
-    alert('Pronostico salvato! Punti: ' + punti)
+    alert('Pronostico inviato correttamente!')
   }
 
   if (!team) {
     return (
-      <main style={{ padding: 20 }}>
-        <h1>Notti Magiche Mondiali ⚽</h1>
+      <main style={styles.page}>
+        <section style={styles.card}>
+          <h1 style={styles.title}>Notti Magiche Mondiali ⚽</h1>
+          <p style={styles.subtitle}>Il gioco di pronostici tra amici.</p>
 
-        <h2>Login squadra</h2>
+          <h2>Accesso squadra</h2>
 
-        <input
-          placeholder="nome squadra"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-        />
+          <div style={styles.row}>
+            <input
+              style={styles.input}
+              placeholder="Nome squadra"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+            />
 
-        <input
-          placeholder="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ marginLeft: 10 }}
-        />
+            <input
+              style={styles.input}
+              placeholder="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-        <button onClick={login} style={{ marginLeft: 10 }}>
-          Entra
-        </button>
+            <button style={styles.button} onClick={login}>
+              Entra
+            </button>
+          </div>
 
-        <p>{messaggio}</p>
+          {messaggio && <p style={styles.error}>{messaggio}</p>}
+        </section>
       </main>
     )
   }
 
   return (
-    <main style={{ padding: 20 }}>
-      <h1>Notti Magiche Mondiali ⚽</h1>
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <h1 style={styles.title}>Notti Magiche Mondiali ⚽</h1>
+        <p style={styles.subtitle}>Ciao, {team.nome_squadra}</p>
 
-      <h2>Ciao {team.nome_squadra}</h2>
+        <h2>Pronostici</h2>
+        <p style={styles.note}>
+          Inserisci il risultato e premi “Invia”. Se cambi idea, puoi inviare di nuovo:
+          varrà l’ultimo pronostico registrato prima dell’inizio della partita.
+        </p>
 
-      <h3>Partite</h3>
+        {matches.map((match) => (
+          <div key={match.id} style={styles.match}>
+            <div>
+              <strong>{match.squadra_casa} vs {match.squadra_trasferta}</strong>
+              <div style={styles.small}>{match.fase}</div>
+              <div style={styles.small}>
+                Inizio: {match.data_ora ? new Date(match.data_ora).toLocaleString('it-IT') : 'orario da definire'}
+              </div>
+            </div>
 
-      {matches.map((match) => (
-        <div key={match.id} style={{ marginBottom: 20 }}>
-          <div>
-            {match.squadra_casa} vs {match.squadra_trasferta}
+            <div style={styles.predictionBox}>
+              <input
+                style={styles.scoreInput}
+                placeholder="0"
+                type="number"
+                min="0"
+                onChange={(e) =>
+                  aggiornaPronostico(match.id, 'casa', e.target.value)
+                }
+              />
+
+              <span style={styles.dash}>-</span>
+
+              <input
+                style={styles.scoreInput}
+                placeholder="0"
+                type="number"
+                min="0"
+                onChange={(e) =>
+                  aggiornaPronostico(match.id, 'trasferta', e.target.value)
+                }
+              />
+
+              <button style={styles.button} onClick={() => inviaPronostico(match)}>
+                Invia
+              </button>
+            </div>
           </div>
-
-          <input
-            placeholder="gol casa"
-            onChange={(e) =>
-              aggiornaPronostico(match.id, 'casa', e.target.value)
-            }
-          />
-
-          <input
-            placeholder="gol trasferta"
-            onChange={(e) =>
-              aggiornaPronostico(match.id, 'trasferta', e.target.value)
-            }
-            style={{ marginLeft: 10 }}
-          />
-
-          <button
-            onClick={() => salvaPronostico(match)}
-            style={{ marginLeft: 10 }}
-          >
-            Salva
-          </button>
-
-          <div style={{ fontSize: 13, marginTop: 5 }}>
-            Risultato reale: {match.gol_casa ?? '-'} - {match.gol_trasferta ?? '-'}
-          </div>
-        </div>
-      ))}
-
-      <h3>Classifica</h3>
-
-      {classifica.map((t) => (
-        <div key={t.id}>
-          {t.nome_squadra} → {t.punti} punti
-        </div>
-      ))}
+        ))}
+      </section>
     </main>
   )
+}
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #07142b, #102f5f)',
+    color: 'white',
+    padding: 24,
+    fontFamily: 'Arial, sans-serif'
+  },
+  card: {
+    maxWidth: 900,
+    margin: '0 auto',
+    background: 'rgba(255,255,255,0.10)',
+    borderRadius: 24,
+    padding: 28,
+    boxShadow: '0 15px 40px rgba(0,0,0,0.25)'
+  },
+  title: {
+    color: '#ffd166',
+    fontSize: 38,
+    marginBottom: 6
+  },
+  subtitle: {
+    opacity: 0.9,
+    marginTop: 0
+  },
+  row: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap'
+  },
+  input: {
+    padding: 12,
+    borderRadius: 10,
+    border: 'none',
+    minWidth: 180
+  },
+  button: {
+    padding: '12px 16px',
+    borderRadius: 10,
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    background: '#ffd166'
+  },
+  error: {
+    color: '#ffb4b4'
+  },
+  note: {
+    opacity: 0.85,
+    lineHeight: 1.5
+  },
+  match: {
+    marginTop: 18,
+    padding: 18,
+    borderRadius: 18,
+    background: 'rgba(255,255,255,0.12)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 16,
+    alignItems: 'center',
+    flexWrap: 'wrap'
+  },
+  small: {
+    fontSize: 14,
+    opacity: 0.75,
+    marginTop: 4
+  },
+  predictionBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8
+  },
+  scoreInput: {
+    width: 64,
+    padding: 10,
+    borderRadius: 10,
+    border: 'none',
+    textAlign: 'center',
+    fontSize: 16
+  },
+  dash: {
+    fontWeight: 'bold',
+    fontSize: 20
+  }
 }
