@@ -17,11 +17,13 @@ export default function Home() {
   const [password, setPassword] = useState('')
 
   const [pronostici, setPronostici] = useState({})
+  const [pronosticiLista, setPronosticiLista] = useState([])
   const [messaggio, setMessaggio] = useState('')
 
   useEffect(() => {
     caricaTeams()
     caricaMatches()
+    caricaPronostici()
   }, [])
 
   async function caricaTeams() {
@@ -32,6 +34,11 @@ export default function Home() {
   async function caricaMatches() {
     const { data } = await supabase.from('matches').select('*')
     setMatches(data || [])
+  }
+
+  async function caricaPronostici() {
+    const { data } = await supabase.from('prediction').select('*')
+    setPronosticiLista(data || [])
   }
 
   function login() {
@@ -88,7 +95,59 @@ export default function Home() {
       return
     }
 
+    await caricaPronostici()
     alert('Pronostico salvato!')
+  }
+
+  function calcolaPunti(p, match) {
+    if (match.gol_casa == null || match.gol_trasferta == null) {
+      return 0
+    }
+
+    const realeCasa = match.gol_casa
+    const realeTrasferta = match.gol_trasferta
+    const pronCasa = p.gol_casa
+    const pronTrasferta = p.gol_trasferta
+
+    if (pronCasa === realeCasa && pronTrasferta === realeTrasferta) {
+      return 10
+    }
+
+    const diffReale = realeCasa - realeTrasferta
+    const diffPron = pronCasa - pronTrasferta
+
+    if (diffReale !== 0 && diffReale === diffPron) {
+      return 5
+    }
+
+    if (
+      (diffReale > 0 && diffPron > 0) ||
+      (diffReale < 0 && diffPron < 0) ||
+      (diffReale === 0 && diffPron === 0)
+    ) {
+      return 3
+    }
+
+    if (pronCasa + pronTrasferta === realeCasa + realeTrasferta) {
+      return 1
+    }
+
+    return 0
+  }
+
+  function puntiSquadra(teamId) {
+    let totale = 0
+
+    pronosticiLista.forEach((p) => {
+      if (p.team_id !== teamId) return
+
+      const match = matches.find((m) => m.id === p.match_id)
+      if (!match) return
+
+      totale += calcolaPunti(p, match)
+    })
+
+    return totale
   }
 
   if (!team) {
@@ -158,6 +217,20 @@ export default function Home() {
           </button>
         </div>
       ))}
+
+      <h3>Classifica</h3>
+
+      {teams
+        .map((t) => ({
+          ...t,
+          punti: puntiSquadra(t.id)
+        }))
+        .sort((a, b) => b.punti - a.punti)
+        .map((t) => (
+          <div key={t.id}>
+            {t.nome_squadra} → {t.punti} punti
+          </div>
+        ))}
     </main>
   )
 }
